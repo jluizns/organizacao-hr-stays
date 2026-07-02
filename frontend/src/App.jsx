@@ -73,14 +73,18 @@ export default function App() {
     e.preventDefault();
     if (!hospede || !quarto || !valor || !checkIn || !checkOut) return;
 
-    // CORREÇÃO AQUI: Chaves mapeadas com sublinhado para conversar com o MySQL
+    // Normaliza o formato das datas geradas por teclados de computadores ou celulares
+    const dataInFormatada = new Date(checkIn + 'T12:00:00').toISOString().split('T')[0];
+    const dataOutFormatada = new Date(checkOut + 'T12:00:00').toISOString().split('T')[0];
+
+    // Mapeamento correto com snake_case para o MySQL e tipagem do valor corrigida
     const novaReserva = { 
       hospede, 
       quarto, 
       origem, 
-      valor, 
-      check_in: checkIn, 
-      check_out: checkOut 
+      valor: Number(valor), 
+      check_in: dataInFormatada, 
+      check_out: dataOutFormatada 
     };
 
     try {
