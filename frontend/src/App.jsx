@@ -11,7 +11,7 @@ export default function App() {
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
 
-  // Função para calcular a diferença de dias entre duas datas
+  // Função para calcular a diferença de dias
   const calcularDias = (inDate, outDate) => {
     if (!inDate || !outDate) return 0;
     const inicio = new Date(inDate);
@@ -20,7 +20,7 @@ export default function App() {
     return Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24)) || 1;
   };
 
-  // 1. BUSCAR RESERVAS DO BANCO (Atualizado para o Render)
+  // 1. BUSCAR RESERVAS DO BANCO
   useEffect(() => {
     fetch('https://organizacao-hr-stays.onrender.com/api/reservas')
       .then(res => res.json())
@@ -35,12 +35,12 @@ export default function App() {
       .catch(err => console.error('Erro ao buscar reservas do banco:', err));
   }, []);
 
-  // 2. SALVAR NOVA RESERVA (Atualizado para o Render)
+  // 2. SALVAR NOVA RESERVA (Corrigido para enviar 'origem')
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!hospede || !quarto || !valor || !checkIn || !checkOut) return;
 
-    const novaReserva = { hospede, quarto, origen: origem, valor, checkIn, checkOut };
+    const novaReserva = { hospede, quarto, origem, valor, checkIn, checkOut };
 
     try {
       const resposta = await fetch('https://organizacao-hr-stays.onrender.com/api/reservas', {
@@ -69,14 +69,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen p-6 font-sans bg-slate-900 text-slate-100">
-      {/* Header */}
       <header className="pb-4 mb-8 border-b border-slate-800">
         <h1 className="text-3xl font-bold text-blue-400">HR Stays • Painel de Reservas</h1>
         <p className="mt-1 text-sm text-slate-400">Controle diário e fechamento mensal</p>
       </header>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Formulário de Cadastro */}
+        {/* Formulário */}
         <div className="p-6 border shadow-lg bg-slate-800 rounded-xl h-fit border-slate-700">
           <h2 className="mb-4 text-xl font-semibold text-slate-200">Nova Reserva</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -149,18 +148,15 @@ export default function App() {
               </div>
             </div>
 
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium p-2.5 rounded-lg transition-colors shadow-md shadow-blue-900/20">
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium p-2.5 rounded-lg transition-colors shadow-md">
               Salvar Reserva
             </button>
           </form>
         </div>
 
-        {/* Tabela de Exibição */}
+        {/* Tabela */}
         <div className="p-6 border shadow-lg lg:col-span-2 bg-slate-800 rounded-xl border-slate-700">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-slate-200">Lista de Ocupação</h2>
-          </div>
-
+          <h2 className="mb-4 text-xl font-semibold text-slate-200">Lista de Ocupação</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
