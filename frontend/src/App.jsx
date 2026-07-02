@@ -20,9 +20,9 @@ export default function App() {
     return Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24)) || 1;
   };
 
-  // 1. BUSCAR RESERVAS DO BANCO
+  // 1. BUSCAR RESERVAS DO BANCO (Atualizado para o Render)
   useEffect(() => {
-    fetch('http://localhost:3000/api/reservas')
+    fetch('https://organizacao-hr-stays.onrender.com/api/reservas')
       .then(res => res.json())
       .then(dados => {
         const dadosFormatados = dados.map(res => ({
@@ -35,15 +35,15 @@ export default function App() {
       .catch(err => console.error('Erro ao buscar reservas do banco:', err));
   }, []);
 
-  // 2. SALVAR NOVA RESERVA
+  // 2. SALVAR NOVA RESERVA (Atualizado para o Render)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!hospede || !quarto || !valor || !checkIn || !checkOut) return;
 
-    const novaReserva = { hospede, quarto, origem, valor, checkIn, checkOut };
+    const novaReserva = { hospede, quarto, origen: origem, valor, checkIn, checkOut };
 
     try {
-      const resposta = await fetch('http://localhost:3000/api/reservas', {
+      const resposta = await fetch('https://organizacao-hr-stays.onrender.com/api/reservas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(novaReserva)
