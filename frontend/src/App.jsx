@@ -20,22 +20,28 @@ export default function App() {
     return Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24)) || 1;
   };
 
-  // 1. BUSCAR RESERVAS DO BANCO
+  // Função auxiliar para buscar e formatar as reservas do banco
+  const carregarReservas = async () => {
+    try {
+      const res = await fetch('https://organizacao-hr-stays.onrender.com/api/reservas');
+      const dados = await res.json();
+      const dadosFormatados = dados.map(item => ({
+        ...item,
+        checkIn: item.check_in ? item.check_in.split('T')[0] : '',
+        checkOut: item.check_out ? item.check_out.split('T')[0] : ''
+      }));
+      setReservas(dadosFormatados);
+    } catch (err) {
+      console.error('Erro ao buscar reservas do banco:', err);
+    }
+  };
+
+  // 1. BUSCAR RESERVAS DO BANCO AO CARREGAR A PÁGINA
   useEffect(() => {
-    fetch('https://organizacao-hr-stays.onrender.com/api/reservas')
-      .then(res => res.json())
-      .then(dados => {
-        const dadosFormatados = dados.map(res => ({
-          ...res,
-          checkIn: res.check_in ? res.check_in.split('T')[0] : '',
-          checkOut: res.check_out ? res.check_out.split('T')[0] : ''
-        }));
-        setReservas(dadosFormatados);
-      })
-      .catch(err => console.error('Erro ao buscar reservas do banco:', err));
+    carregarReservas();
   }, []);
 
-  // 2. SALVAR NOVA RESERVA
+  // 2. SALVAR NOVA RESERVA (Sincronização Dinâmica e Instantânea)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!hospede || !quarto || !valor || !checkIn || !checkOut) return;
@@ -49,9 +55,9 @@ export default function App() {
         body: JSON.stringify(novaReserva)
       });
 
-      if (resposta.ok) {
-        const reservaSalva = await respuesta.json();
-        setReservas([reservaSalva, ...reservas]);
+      if (respuesta.ok) {
+        // Busca a lista atualizada direto do banco imediatamente
+        await carregarReservas();
         
         // Limpa o formulário
         setHospede('');
@@ -158,7 +164,6 @@ export default function App() {
         <div className="p-5 border shadow-lg md:p-6 lg:col-span-2 bg-slate-800 rounded-xl border-slate-700">
           <h2 className="mb-4 text-lg font-semibold md:text-xl text-slate-200">Lista de Ocupação</h2>
           
-          {/* O segredo da responsividade da tabela está nesta div abaixo (overflow-x-auto + min-w) */}
           <div className="w-full overflow-x-auto border rounded-lg border-slate-700/50">
             <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
