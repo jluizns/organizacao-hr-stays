@@ -67,16 +67,18 @@ export default function App() {
     carregarReservas();
   }, []);
 
-  // 2. SALVAR NOVA RESERVA (Sincronização Dinâmica e Instantânea)
+  // 2. SALVAR NOVA RESERVA (Sincronização Dinâmica e Instantânea com Diagnóstico)
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!hospede || !quarto || !valor || !checkIn || !checkOut) return;
+    if (!hospede || !quarto || !valor || !checkIn || !checkOut) {
+      alert('Por favor, preencha todos os campos!');
+      return;
+    }
 
-    // Enviando as strings de data direto (já estão no formato YYYY-MM-DD exigido pelo MySQL)
     const novaReserva = { 
-      hospede, 
-      quarto, 
-      origem, 
+      hospede: String(hospede).trim(), 
+      quarto: String(quarto).trim(), 
+      origem: String(origem), 
       valor: Number(valor), 
       check_in: checkIn, 
       check_out: checkOut 
@@ -89,20 +91,26 @@ export default function App() {
         body: JSON.stringify(novaReserva)
       });
 
-      if (respuesta.ok) {
-        await carregarReservas();
-        
-        // Limpa o formulário
-        setHospede('');
-        setQuarto('');
-        setValor('');
-        setCheckIn('');
-        setCheckOut('');
-      } else {
-        alert('Erro ao salvar a reserva no servidor.');
+      // Captura o erro exato retornado pela API caso falhe
+      if (!respuesta.ok) {
+        const textoErro = await respuesta.text();
+        alert(`Erro no Servidor (${respuesta.status}): ${textoErro || 'O banco rejeitou os dados.'}`);
+        return;
       }
+
+      await carregarReservas();
+      
+      // Limpa o formulário
+      setHospede('');
+      setQuarto('');
+      setValor('');
+      setCheckIn('');
+      setCheckOut('');
+      alert('Reserva salva com sucesso!');
+
     } catch (err) {
       console.error('Erro na requisição:', err);
+      alert(`Falha na rede: Sem conexão com o servidor. Detalhe: ${err.message}`);
     }
   };
 
