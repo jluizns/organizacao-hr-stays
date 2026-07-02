@@ -73,7 +73,15 @@ export default function App() {
     e.preventDefault();
     if (!hospede || !quarto || !valor || !checkIn || !checkOut) return;
 
-    const novaReserva = { hospede, quarto, origem, valor, checkIn, checkOut };
+    // CORREÇÃO AQUI: Chaves mapeadas com sublinhado para conversar com o MySQL
+    const novaReserva = { 
+      hospede, 
+      quarto, 
+      origem, 
+      valor, 
+      check_in: checkIn, 
+      check_out: checkOut 
+    };
 
     try {
       const respuesta = await fetch('https://organizacao-hr-stays.onrender.com/api/reservas', {
