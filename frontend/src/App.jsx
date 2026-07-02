@@ -14,8 +14,8 @@ export default function App() {
   // Função para calcular a diferença de dias entre check-in e check-out
   const calcularDias = (inDate, outDate) => {
     if (!inDate || !outDate) return 0;
-    const inicio = new Date(inDate);
-    const fim = new Date(outDate);
+    const inicio = new Date(inDate + 'T00:00:00');
+    const fim = new Date(outDate + 'T00:00:00');
     const diferencaTempo = Math.abs(fim - inicio);
     return Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24)) || 1;
   };
@@ -24,7 +24,6 @@ export default function App() {
   const obterStatusCheckout = (outDate) => {
     if (!outDate) return 'Hoje';
 
-    // Cria a data de hoje baseada no fuso local (Ano-Mês-Dia) para evitar problemas de fuso horário
     const hojeLocal = new Date();
     const ano = hojeLocal.getFullYear();
     const mes = String(hojeLocal.getMonth() + 1).padStart(2, '0');
@@ -73,18 +72,14 @@ export default function App() {
     e.preventDefault();
     if (!hospede || !quarto || !valor || !checkIn || !checkOut) return;
 
-    // Normaliza o formato das datas geradas por teclados de computadores ou celulares
-    const dataInFormatada = new Date(checkIn + 'T12:00:00').toISOString().split('T')[0];
-    const dataOutFormatada = new Date(checkOut + 'T12:00:00').toISOString().split('T')[0];
-
-    // Mapeamento correto com snake_case para o MySQL e tipagem do valor corrigida
+    // Enviando as strings de data direto (já estão no formato YYYY-MM-DD exigido pelo MySQL)
     const novaReserva = { 
       hospede, 
       quarto, 
       origem, 
       valor: Number(valor), 
-      check_in: dataInFormatada, 
-      check_out: dataOutFormatada 
+      check_in: checkIn, 
+      check_out: checkOut 
     };
 
     try {
@@ -95,7 +90,6 @@ export default function App() {
       });
 
       if (respuesta.ok) {
-        // Busca a lista atualizada direto do banco imediatamente
         await carregarReservas();
         
         // Limpa o formulário
