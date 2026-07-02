@@ -11,13 +11,40 @@ export default function App() {
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
 
-  // Função para calcular a diferença de dias
+  // Função para calcular a diferença de dias entre check-in e check-out
   const calcularDias = (inDate, outDate) => {
     if (!inDate || !outDate) return 0;
     const inicio = new Date(inDate);
     const fim = new Date(outDate);
     const diferencaTempo = Math.abs(fim - inicio);
     return Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24)) || 1;
+  };
+
+  // Função para calcular o status em tempo real com base no Check-out
+  const obterStatusCheckout = (outDate) => {
+    if (!outDate) return 'Hoje';
+
+    // Cria a data de hoje baseada no fuso local (Ano-Mês-Dia) para evitar problemas de fuso horário
+    const hojeLocal = new Date();
+    const ano = hojeLocal.getFullYear();
+    const mes = String(hojeLocal.getMonth() + 1).padStart(2, '0');
+    const dia = String(hojeLocal.getDate()).padStart(2, '0');
+    
+    const hoje = new Date(`${ano}-${mes}-${dia}T00:00:00`);
+    const dataFim = new Date(`${outDate}T00:00:00`);
+
+    const diferencaTempo = dataFim - hoje;
+    const diferencaDias = Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24));
+
+    if (diferencaDias === 0) {
+      return 'Sai hoje';
+    } else if (diferencaDias === 1) {
+      return 'Sai amanhã';
+    } else if (diferencaDias > 1) {
+      return `Sai em ${diferencaDias} dias`;
+    } else {
+      return 'Check-out encerrado';
+    }
   };
 
   // Função auxiliar para buscar e formatar as reservas do banco
@@ -196,8 +223,16 @@ export default function App() {
                         R$ {Number(reserva.valor).toFixed(2)}
                       </td>
                       <td className="p-3 text-right">
-                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          {reserva.status || 'Hoje'}
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
+                          obterStatusCheckout(reserva.checkOut) === 'Sai hoje'
+                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            : obterStatusCheckout(reserva.checkOut) === 'Sai amanhã'
+                            ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                            : obterStatusCheckout(reserva.checkOut) === 'Check-out encerrado'
+                            ? 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+                            : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        }`}>
+                          {obterStatusCheckout(reserva.checkOut)}
                         </span>
                       </td>
                     </tr>
