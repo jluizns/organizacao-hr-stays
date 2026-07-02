@@ -89,13 +89,16 @@ export default function App() {
     const dataInFormatada = formatarParaBanco(checkIn);
     const dataOutFormatada = formatarParaBanco(checkOut);
 
+    // Mapeamento duplo para suportar tanto camelCase quanto snake_case no Back-end
     const novaReserva = { 
       hospede: String(hospede).trim(), 
       quarto: String(quarto).trim(), 
       origem: String(origem), 
       valor: Number(valor), 
       check_in: dataInFormatada, 
-      check_out: dataOutFormatada 
+      check_out: dataOutFormatada,
+      checkIn: dataInFormatada,     
+      checkOut: dataOutFormatada    
     };
 
     try {
@@ -105,9 +108,10 @@ export default function App() {
         body: JSON.stringify(novaReserva)
       });
 
+      // Captura a mensagem real enviada pelo servidor Node se o status não for 200/201
       if (!respuesta.ok) {
         const textoErro = await respuesta.text();
-        alert(`Erro no Servidor (${respuesta.status}): ${textoErro || 'O banco rejeitou o formato dos dados.'}`);
+        alert(`Erro no Servidor (${respuesta.status}): ${textoErro || 'O back-end recusou os dados.'}`);
         return;
       }
 
@@ -122,7 +126,7 @@ export default function App() {
 
     } catch (err) {
       console.error('Erro na requisição:', err);
-      alert(`Falha de rede: ${err.message}`);
+      alert(`Falha de rede: Sem conexão com a API. Detalhe: ${err.message}`);
     }
   };
 
