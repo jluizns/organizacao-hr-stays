@@ -3,25 +3,27 @@ import mysql from 'mysql2/promise';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
-require('dotenv').config();
+// Carrega as variáveis de ambiente
+dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Configuração do pool de conexões com o MySQL
-// Configuração do pool de conexões com o MySQL
+// Configuração do pool de conexões correta para a Aiven (com SSL)
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME || 'centralDeHospedagem',
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  ssl: { rejectUnauthorized: false },
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
 });
 
-// TESTE DE CONEXÃO INICIAL COM O BANCO (Evita que o node caia em silêncio)
+// Teste de conexão inicial para ver nos logs do Render
 async function testarConexao() {
   try {
     const conexao = await pool.getConnection();
@@ -29,12 +31,11 @@ async function testarConexao() {
     conexao.release();
   } catch (error) {
     console.error('❌ ERRO CRÍTICO AO CONECTAR NO MYSQL:', error.message);
-    console.error('Verifique se o seu MySQL Workbench está aberto e se os dados do arquivo .env estão corretos.');
   }
 }
 testarConexao();
 
-// 1. ROTA PARA BUSCAR TODAS AS RESERVAS (GET)
+// 1. ROTA GET
 app.get('/api/reservas', async (req, res) => {
   try {
     const [linhas] = await pool.query('SELECT * FROM reservas ORDER BY id DESC');
@@ -45,7 +46,7 @@ app.get('/api/reservas', async (req, res) => {
   }
 });
 
-// 2. ROTA PARA SALVAR UMA NOVA RESERVA (POST)
+// 2. ROTA POST
 app.post('/api/reservas', async (req, res) => {
   console.log('--- Nova requisição recebida no Back-end ---');
   console.log('Dados do corpo (req.body):', req.body);
