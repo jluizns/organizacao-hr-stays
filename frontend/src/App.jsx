@@ -11,11 +11,24 @@ export default function App() {
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
 
+  // Função para garantir formato YYYY-MM-DD exigido pelo Banco
+  const formatarParaBanco = (dataString) => {
+    if (!dataString) return '';
+    // Se o input já mandar YYYY-MM-DD
+    if (dataString.includes('-')) return dataString;
+    // Caso algum navegador jogue DD/MM/AAAA
+    if (dataString.includes('/')) {
+      const [dia, mes, ano] = dataString.split('/');
+      return `${ano}-${mes}-${dia}`;
+    }
+    return dataString;
+  };
+
   // Função para calcular a diferença de dias entre check-in e check-out
   const calcularDias = (inDate, outDate) => {
     if (!inDate || !outDate) return 0;
-    const inicio = new Date(inDate + 'T00:00:00');
-    const fim = new Date(outDate + 'T00:00:00');
+    const inicio = new Date(formatarParaBanco(inDate) + 'T00:00:00');
+    const fim = new Date(formatarParaBanco(outDate) + 'T00:00:00');
     const diferencaTempo = Math.abs(fim - inicio);
     return Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24)) || 1;
   };
@@ -30,7 +43,7 @@ export default function App() {
     const dia = String(hojeLocal.getDate()).padStart(2, '0');
     
     const hoje = new Date(`${ano}-${mes}-${dia}T00:00:00`);
-    const dataFim = new Date(`${outDate}T00:00:00`);
+    const dataFim = new Date(`${formatarParaBanco(outDate)}T00:00:00`);
 
     const diferencaTempo = dataFim - hoje;
     const diferencaDias = Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24));
@@ -46,7 +59,6 @@ export default function App() {
     }
   };
 
-  // Função auxiliar para buscar e formatar as reservas do banco
   const carregarReservas = async () => {
     try {
       const res = await fetch('https://organizacao-hr-stays.onrender.com/api/reservas');
@@ -62,12 +74,10 @@ export default function App() {
     }
   };
 
-  // 1. BUSCAR RESERVAS DO BANCO AO CARREGAR A PÁGINA
   useEffect(() => {
     carregarReservas();
   }, []);
 
-  // 2. SALVAR NOVA RESERVA (Sincronização Dinâmica e Instantânea com Diagnóstico)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!hospede || !quarto || !valor || !checkIn || !checkOut) {
@@ -75,13 +85,17 @@ export default function App() {
       return;
     }
 
+    // Forçando a conversão limpa antes do envio
+    const dataInFormatada = formatarParaBanco(checkIn);
+    const dataOutFormatada = formatarParaBanco(checkOut);
+
     const novaReserva = { 
       hospede: String(hospede).trim(), 
       quarto: String(quarto).trim(), 
       origem: String(origem), 
       valor: Number(valor), 
-      check_in: checkIn, 
-      check_out: checkOut 
+      check_in: dataInFormatada, 
+      check_out: dataOutFormatada 
     };
 
     try {
@@ -91,26 +105,24 @@ export default function App() {
         body: JSON.stringify(novaReserva)
       });
 
-      // Captura o erro exato retornado pela API caso falhe
       if (!respuesta.ok) {
         const textoErro = await respuesta.text();
-        alert(`Erro no Servidor (${respuesta.status}): ${textoErro || 'O banco rejeitou os dados.'}`);
+        alert(`Erro no Servidor (${respuesta.status}): ${textoErro || 'O banco rejeitou o formato dos dados.'}`);
         return;
       }
 
       await carregarReservas();
       
-      // Limpa o formulário
       setHospede('');
       setQuarto('');
       setValor('');
       setCheckIn('');
       setCheckOut('');
-      alert('Reserva salva com sucesso!');
+      alert('Reserva salva com sucesso! 🎉');
 
     } catch (err) {
       console.error('Erro na requisição:', err);
-      alert(`Falha na rede: Sem conexão com o servidor. Detalhe: ${err.message}`);
+      alert(`Falha de rede: ${err.message}`);
     }
   };
 
