@@ -10,7 +10,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Configuração do pool de conexões correta para a Aiven (com SSL)
+// Configuração do pool de conexões para a Aiven (com SSL)
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
@@ -35,7 +35,7 @@ async function testarConexao() {
 }
 testarConexao();
 
-// 1. ROTA GET
+// 1. ROTA GET - Busca todas as reservas
 app.get('/api/reservas', async (req, res) => {
   try {
     const [linhas] = await pool.query('SELECT * FROM reservas ORDER BY id DESC');
@@ -46,24 +46,30 @@ app.get('/api/reservas', async (req, res) => {
   }
 });
 
-// 2. ROTA POST
+// 2. ROTA POST - Cria uma nova reserva
 app.post('/api/reservas', async (req, res) => {
   console.log('--- Nova requisição recebida no Back-end ---');
   console.log('Dados do corpo (req.body):', req.body);
 
+  // Desestruturação exata em camelCase vinda do Front-end atualizado
   const { hospede, quarto, origem, valor, checkIn, checkOut } = req.body;
 
+  // Validação estrita dos campos obrigatórios
   if (!hospede || !quarto || !origem || !valor || !checkIn || !checkOut) {
     console.log('❌ Falha na validação: Campos obrigatórios ausentes.');
     return res.status(400).json({ erro: 'Todos os campos são obrigatórios' });
   }
 
   try {
+    // Query mapeando as colunas em snake_case do MySQL
     const query = 'INSERT INTO reservas (hospede, quarto, origem, valor, check_in, check_out) VALUES (?, ?, ?, ?, ?, ?)';
+    
+    // Passando os valores recebidos na ordem exata dos placeholders (?)
     const [resultado] = await pool.query(query, [hospede, quarto, origem, valor, checkIn, checkOut]);
     
     console.log('✅ Sucesso! Reserva salva no MySQL com ID:', resultado.insertId);
 
+    // Retorna a resposta de sucesso com o objeto criado
     res.status(201).json({
       id: resultado.insertId,
       hospede,

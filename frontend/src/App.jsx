@@ -14,9 +14,7 @@ export default function App() {
   // Função para garantir formato YYYY-MM-DD exigido pelo Banco
   const formatarParaBanco = (dataString) => {
     if (!dataString) return '';
-    // Se o input já mandar YYYY-MM-DD
     if (dataString.includes('-')) return dataString;
-    // Caso algum navegador jogue DD/MM/AAAA
     if (dataString.includes('/')) {
       const [dia, mes, ano] = dataString.split('/');
       return `${ano}-${mes}-${dia}`;
@@ -65,6 +63,7 @@ export default function App() {
       const dados = await res.json();
       const dadosFormatados = dados.map(item => ({
         ...item,
+        // Garante o mapeamento correto vindo do banco em snake_case para o estado do front
         checkIn: item.check_in ? item.check_in.split('T')[0] : '',
         checkOut: item.check_out ? item.check_out.split('T')[0] : ''
       }));
@@ -80,26 +79,27 @@ export default function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validação local no Front-end antes de disparar a requisição
     if (!hospede || !quarto || !valor || !checkIn || !checkOut) {
-      alert('Por favor, preencha todos os campos!');
+      alert('Por favor, preencha todos os campos no ecrã!');
       return;
     }
 
-    // Forçando a conversão limpa antes do envio
     const dataInFormatada = formatarParaBanco(checkIn);
     const dataOutFormatada = formatarParaBanco(checkOut);
 
-    // Mapeamento duplo para suportar tanto camelCase quanto snake_case no Back-end
+    // OBJETO CORRIGIDO: Mapeado perfeitamente com a desestruturação do seu Back-end
     const novaReserva = { 
-      hospede: String(hospede).trim(), 
-      quarto: String(quarto).trim(), 
-      origem: String(origem), 
-      valor: Number(valor), 
-      check_in: dataInFormatada, 
-      check_out: dataOutFormatada,
-      checkIn: dataInFormatada,     
-      checkOut: dataOutFormatada    
+      hospede: String(hospede).trim(),
+      quarto: String(quarto).trim(),
+      origem: String(origem),
+      valor: Number(valor),
+      checkIn: dataInFormatada,   // camelCase exato
+      checkOut: dataOutFormatada  // camelCase exato corrigido!
     };
+
+    console.log("Enviando dados formatados para a API:", novaReserva);
 
     try {
       const respuesta = await fetch('https://organizacao-hr-stays.onrender.com/api/reservas', {
@@ -108,25 +108,27 @@ export default function App() {
         body: JSON.stringify(novaReserva)
       });
 
-      // Captura a mensagem real enviada pelo servidor Node se o status não for 200/201
       if (!respuesta.ok) {
         const textoErro = await respuesta.text();
-        alert(`Erro no Servidor (${respuesta.status}): ${textoErro || 'O back-end recusou os dados.'}`);
+        alert(`Erro no Servidor (${respuesta.status}): ${textoErro}`);
         return;
       }
 
+      // Atualiza a tabela com os dados novos do banco
       await carregarReservas();
       
+      // Limpa os campos do formulário
       setHospede('');
       setQuarto('');
       setValor('');
       setCheckIn('');
       setCheckOut('');
+      
       alert('Reserva salva com sucesso! 🎉');
 
     } catch (err) {
       console.error('Erro na requisição:', err);
-      alert(`Falha de rede: Sem conexão com a API. Detalhe: ${err.message}`);
+      alert(`Falha de rede: ${err.message}`);
     }
   };
 
