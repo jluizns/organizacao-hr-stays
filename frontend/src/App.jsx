@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 export default function App() {
   const [reservas, setReservas] = useState([]);
+  const [mesFiltro, setMesFiltro] = useState('Todos');
   
   // Estados do Formulário
   const [hospede, setHospede] = useState('');
@@ -11,59 +12,65 @@ export default function App() {
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
 
-  // Função simplificada: Inputs tipo date já vem como YYYY-MM-DD
+  // Função para garantir formato YYYY-MM-DD exigido pelo Banco
   const formatarParaBanco = (dataString) => {
     if (!dataString) return '';
-    return dataString.split('T')[0];
+    if (dataString.includes('-')) return dataString;
+    if (dataString.includes('/')) {
+      const [dia, mes, ano] = dataString.split('/');
+      return `${ano}-${mes}-${dia}`;
+    }
+    return dataString;
   };
 
-  // Calcula a diferença exata de dias sem sofrer com fuso horário
+  // Função para calcular a diferença de dias entre check-in e check-out
   const calcularDias = (inDate, outDate) => {
     if (!inDate || !outDate) return 0;
-    const inicio = new Date(formatarParaBanco(inDate) + 'T12:00:00');
-    const fim = new Date(formatarParaBanco(outDate) + 'T12:00:00');
-    const diferencaTempo = fim - inicio;
-    const dias = Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24));
-    return dias > 0 ? dias : 1;
+    const inicio = new Date(formatarParaBanco(inDate) + 'T00:00:00');
+    const fim = new Date(formatarParaBanco(outDate) + 'T00:00:00');
+    const diferencaTempo = Math.abs(fim - inicio);
+    return Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24)) || 1;
   };
 
-  // Função para calcular o status com base no Check-out
+  // Retorna a string do dia de hoje formatada em YYYY-MM-DD (Fuso Local)
+  const obterHojeStringLocal = () => {
+    const hojeLocal = new Date();
+    const ano = hojeLocal.getFullYear();
+    const mes = String(hojeLocal.getMonth() + 1).padStart(2, '0');
+    const dia = String(hojeLocal.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  };
+
+  // Função para calcular o status em tempo real com base no Check-out
   const obterStatusCheckout = (outDate) => {
     if (!outDate) return 'Hoje';
 
-    const hojeLocal = new Date();
-    hojeLocal.setHours(0, 0, 0, 0);
-    
-    const dataFim = new Date(formatarParaBanco(outDate) + 'T00:00:00');
-    dataFim.setHours(0, 0, 0, 0);
+    const hoje = new Date(obterHojeStringLocal() + 'T00:00:00');
+    const dataFim = new Date(`${formatarParaBanco(outDate)}T00:00:00`);
 
-    const diferencaTempo = dataFim - hojeLocal;
-    const diferencaDias = Math.round(diferencaTempo / (1000 * 60 * 60 * 24));
+    const diferencaTempo = dataFim - hoje;
+    const diferencaDias = Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24));
 
-    if (diferencaDias === 0) return 'Sai hoje';
-    if (diferencaDias === 1) return 'Sai amanhã';
-    if (diferencaDias > 1) return `Sai em ${diferencaDias} dias`;
-    return 'Check-out encerrado';
+    if (diferencaDias === 0) {
+      return 'Sai hoje';
+    } else if (diferencaDias === 1) {
+      return 'Sai amanhã';
+    } else if (diferencaDias > 1) {
+      return `Sai em ${diferencaDias} dias`;
+    } else {
+      return 'Check-out encerrado';
+    }
   };
 
   const carregarReservas = async () => {
     try {
       const res = await fetch('https://organizacao-hr-stays.onrender.com/api/reservas');
-      if (!res.ok) throw new Error('Erro ao buscar dados do servidor');
-      
       const dados = await res.json();
-      
-      // Garante que o Front vai ler tanto camelCase quanto snake_case sem quebrar
       const dadosFormatados = dados.map(item => ({
-        id: item.id,
-        hospede: item.hospede,
-        quarto: item.quarto,
-        origem: item.origem,
-        valor: item.valor,
-        checkIn: item.check_in ? item.check_in.split('T')[0] : (item.checkIn || ''),
-        checkOut: item.check_out ? item.check_out.split('T')[0] : (item.checkOut || '')
+        ...item,
+        checkIn: item.check_in ? item.check_in.split('T')[0] : '',
+        checkOut: item.check_out ? item.check_out.split('T')[0] : ''
       }));
-      
       setReservas(dadosFormatados);
     } catch (err) {
       console.error('Erro ao buscar reservas do banco:', err);
@@ -78,18 +85,20 @@ export default function App() {
     e.preventDefault();
     
     if (!hospede || !quarto || !valor || !checkIn || !checkOut) {
-      alert('Por favor, preencha todos os campos!');
+      alert('Por favor, preencha todos os campos no ecrã!');
       return;
     }
 
-    // Monta o payload limpo em camelCase exato para o Back-end
+    const dataInFormatada = formatarParaBanco(checkIn);
+    const dataOutFormatada = formatarParaBanco(checkOut);
+
     const novaReserva = { 
       hospede: String(hospede).trim(),
       quarto: String(quarto).trim(),
       origem: String(origem),
       valor: Number(valor),
-      checkIn: checkIn,   
-      checkOut: checkOut  
+      checkIn: dataInFormatada,
+      checkOut: dataOutFormatada
     };
 
     try {
@@ -107,7 +116,6 @@ export default function App() {
 
       await carregarReservas();
       
-      // Limpa formulário
       setHospede('');
       setQuarto('');
       setValor('');
@@ -121,12 +129,70 @@ export default function App() {
     }
   };
 
+  // --- LÓGICA DE ACOMPANHAMENTO DIÁRIO E FECHAMENTO MENSAL ---
+  const hojeStr = obterHojeStringLocal();
+
+  // 1. Métricas baseadas estritamente no dia de hoje
+  const checkInsHoje = reservas.filter(r => r.checkIn === hojeStr);
+  const checkOutsHoje = reservas.filter(r => r.checkOut === hojeStr);
+  
+  const hospedesAtivosHoje = reservas.filter(r => {
+    return hojeStr >= r.checkIn && hojeStr <= r.checkOut;
+  });
+
+  // 2. Filtragem por Mês para Fechamento Mensal
+  const filtrarPorMesYTD = (lista) => {
+    if (mesFiltro === 'Todos') return lista;
+    return lista.filter(r => {
+      // Pega o mês numérico da string YYYY-MM-DD (índice 1 no split)
+      const mesReserva = r.checkIn.split('-')[1]; 
+      return mesReserva === mesFiltro;
+    });
+  };
+
+  const reservasFiltradas = filtrarPorMesYTD(reservas);
+
+  // 3. Faturamento recalculado com base no mês selecionado (ou total)
+  const faturamentoTotal = reservasFiltradas.reduce((acc, curr) => acc + Number(curr.valor), 0);
+
   return (
     <div className="min-h-screen p-4 font-sans md:p-6 bg-slate-900 text-slate-100">
-      <header className="pb-4 mb-6 text-center border-b border-slate-800 md:text-left">
-        <h1 className="text-2xl font-bold text-blue-400 md:text-3xl">HR Stays • Painel de Reservas</h1>
-        <p className="mt-1 text-xs md:text-sm text-slate-400">Controle diário e fechamento mensal</p>
+      <header className="flex flex-col items-center justify-between gap-4 pb-4 mb-6 border-b border-slate-800 md:flex-row">
+        <div className="text-center md:text-left">
+          <h1 className="text-2xl font-bold text-blue-400 md:text-3xl">HR Stays • Painel de Reservas</h1>
+          <p className="mt-1 text-xs md:text-sm text-slate-400">Controle diário e fechamento mensal em tempo real</p>
+        </div>
+        <div className="px-3 py-2 font-mono text-xs border rounded-lg bg-slate-800 border-slate-700 text-slate-300">
+          📅 Hoje é: {hojeStr.split('-').reverse().join('/')}
+        </div>
       </header>
+
+      {/* --- DASHBOARD: CARDS DE ACOMPANHAMENTO DIÁRIO --- */}
+      <div className="grid grid-cols-2 gap-4 mb-6 lg:grid-cols-4">
+        <div className="p-4 border shadow-md bg-slate-800 rounded-xl border-slate-700">
+          <p className="text-xs font-semibold uppercase text-slate-400">Ativos no Imóvel</p>
+          <p className="mt-2 text-2xl font-bold text-blue-400">{hospedesAtivosHoje.length}</p>
+          <p className="text-[10px] text-slate-500 mt-1">Hóspedes dentro do imóvel hoje</p>
+        </div>
+
+        <div className="p-4 border shadow-md bg-slate-800 rounded-xl border-slate-700">
+          <p className="text-xs font-semibold uppercase text-slate-400">Check-ins de Hoje</p>
+          <p className="mt-2 text-2xl font-bold text-emerald-400">{checkInsHoje.length}</p>
+          <p className="text-[10px] text-slate-500 mt-1">Chegando na data de hoje</p>
+        </div>
+
+        <div className="p-4 border shadow-md bg-slate-800 rounded-xl border-slate-700">
+          <p className="text-xs font-semibold uppercase text-slate-400">Check-outs de Hoje</p>
+          <p className="mt-2 text-2xl font-bold text-amber-400">{checkOutsHoje.length}</p>
+          <p className="text-[10px] text-slate-500 mt-1">Saindo na data de hoje</p>
+        </div>
+
+        <div className="p-4 border shadow-md bg-slate-800 rounded-xl border-slate-700">
+          <p className="text-xs font-semibold uppercase text-slate-400">Faturamento ({mesFiltro === 'Todos' ? 'Total' : 'Mês'})</p>
+          <p className="mt-2 text-2xl font-bold text-emerald-400">R$ {faturamentoTotal.toFixed(2)}</p>
+          <p className="text-[10px] text-slate-500 mt-1">Soma do período filtrado abaixo</p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Formulário */}
@@ -210,7 +276,33 @@ export default function App() {
 
         {/* Tabela Responsiva */}
         <div className="p-5 border shadow-lg md:p-6 lg:col-span-2 bg-slate-800 rounded-xl border-slate-700">
-          <h2 className="mb-4 text-lg font-semibold md:text-xl text-slate-200">Lista de Ocupação</h2>
+          <div className="flex flex-col items-start justify-between gap-4 mb-4 sm:flex-row sm:items-center">
+            <h2 className="text-lg font-semibold md:text-xl text-slate-200">Lista de Ocupação</h2>
+            
+            {/* SELETOR PARA FECHAMENTO MENSAL */}
+            <div className="flex items-center w-full gap-2 sm:w-auto">
+              <label className="text-xs font-medium uppercase text-slate-400 whitespace-nowrap">Filtrar Mês:</label>
+              <select 
+                value={mesFiltro}
+                onChange={e => setMesFiltro(e.target.value)}
+                className="w-full p-2 text-xs text-white border rounded-lg bg-slate-900 border-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none sm:w-auto"
+              >
+                <option value="Todos">Ver Todos</option>
+                <option value="01">Janeiro</option>
+                <option value="02">Fevereiro</option>
+                <option value="03">Março</option>
+                <option value="04">Abril</option>
+                <option value="05">Maio</option>
+                <option value="06">Junho</option>
+                <option value="07">Julho</option>
+                <option value="08">Agosto</option>
+                <option value="09">Setembro</option>
+                <option value="10">Outubro</option>
+                <option value="11">Novembro</option>
+                <option value="12">Dezembro</option>
+              </select>
+            </div>
+          </div>
           
           <div className="w-full overflow-x-auto border rounded-lg border-slate-700/50">
             <table className="w-full text-left border-collapse min-w-[600px]">
@@ -225,14 +317,19 @@ export default function App() {
                 </tr>
               </thead>
               <tbody className="text-sm divide-y divide-slate-700/50">
-                {reservas.length === 0 ? (
+                {reservasFiltradas.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="py-8 text-center text-slate-500">Nenhuma reserva encontrada no MySQL.</td>
+                    <td colSpan="6" className="py-8 text-center text-slate-500">Nenhuma reserva para o período selecionado.</td>
                   </tr>
                 ) : (
-                  reservas.map(reserva => (
+                  reservasFiltradas.map(reserva => (
                     <tr key={reserva.id} className="transition-colors hover:bg-slate-700/30">
-                      <td className="p-3 font-medium text-slate-200">{reserva.hospede}</td>
+                      <td className="p-3 font-medium text-slate-200">
+                        {reserva.hospede}
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          {reserva.checkIn.split('-').reverse().join('/')} até {reserva.checkOut.split('-').reverse().join('/')}
+                        </div>
+                      </td>
                       <td className="p-3 text-slate-300">
                         <span className="px-2 py-1 font-mono text-xs border rounded bg-slate-900 border-slate-700">{reserva.quarto}</span>
                       </td>
