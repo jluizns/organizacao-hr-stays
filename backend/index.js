@@ -51,21 +51,24 @@ app.post('/api/reservas', async (req, res) => {
   console.log('--- Nova requisição recebida no Back-end ---');
   console.log('Dados do corpo (req.body):', req.body);
 
-  // Desestruturação exata em camelCase vinda do Front-end atualizado
   const { hospede, quarto, origem, valor, checkIn, checkOut } = req.body;
 
   // Validação estrita dos campos obrigatórios
   if (!hospede || !quarto || !origem || !valor || !checkIn || !checkOut) {
-    console.log('❌ Falha na validação: Campos obrigatórios ausentes.');
+    console.log('❌ Falha na validação: Campos obrigatórios ausentes ou nulos.');
     return res.status(400).json({ erro: 'Todos os campos são obrigatórios' });
   }
 
   try {
+    // Garante que as datas vão pro banco apenas como YYYY-MM-DD sem ISOString completa (evita que o fuso horário mude o dia)
+    const dataInLimpa = checkIn.split('T')[0];
+    const dataOutLimpa = checkOut.split('T')[0];
+
     // Query mapeando as colunas em snake_case do MySQL
     const query = 'INSERT INTO reservas (hospede, quarto, origem, valor, check_in, check_out) VALUES (?, ?, ?, ?, ?, ?)';
     
     // Passando os valores recebidos na ordem exata dos placeholders (?)
-    const [resultado] = await pool.query(query, [hospede, quarto, origem, valor, checkIn, checkOut]);
+    const [resultado] = await pool.query(query, [hospede, quarto, origem, valor, dataInLimpa, dataOutLimpa]);
     
     console.log('✅ Sucesso! Reserva salva no MySQL com ID:', resultado.insertId);
 
@@ -76,8 +79,8 @@ app.post('/api/reservas', async (req, res) => {
       quarto,
       origem,
       valor,
-      checkIn,
-      checkOut,
+      checkIn: dataInLimpa,
+      checkOut: dataOutLimpa,
       status: 'Hoje'
     });
   } catch (error) {

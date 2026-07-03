@@ -11,62 +11,59 @@ export default function App() {
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
 
-  // Função para garantir formato YYYY-MM-DD exigido pelo Banco
+  // Função simplificada: Inputs tipo date já vem como YYYY-MM-DD
   const formatarParaBanco = (dataString) => {
     if (!dataString) return '';
-    if (dataString.includes('-')) return dataString;
-    if (dataString.includes('/')) {
-      const [dia, mes, ano] = dataString.split('/');
-      return `${ano}-${mes}-${dia}`;
-    }
-    return dataString;
+    return dataString.split('T')[0];
   };
 
-  // Função para calcular a diferença de dias entre check-in e check-out
+  // Calcula a diferença exata de dias sem sofrer com fuso horário
   const calcularDias = (inDate, outDate) => {
     if (!inDate || !outDate) return 0;
-    const inicio = new Date(formatarParaBanco(inDate) + 'T00:00:00');
-    const fim = new Date(formatarParaBanco(outDate) + 'T00:00:00');
-    const diferencaTempo = Math.abs(fim - inicio);
-    return Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24)) || 1;
+    const inicio = new Date(formatarParaBanco(inDate) + 'T12:00:00');
+    const fim = new Date(formatarParaBanco(outDate) + 'T12:00:00');
+    const diferencaTempo = fim - inicio;
+    const dias = Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24));
+    return dias > 0 ? dias : 1;
   };
 
-  // Função para calcular o status em tempo real com base no Check-out
+  // Função para calcular o status com base no Check-out
   const obterStatusCheckout = (outDate) => {
     if (!outDate) return 'Hoje';
 
     const hojeLocal = new Date();
-    const ano = hojeLocal.getFullYear();
-    const mes = String(hojeLocal.getMonth() + 1).padStart(2, '0');
-    const dia = String(hojeLocal.getDate()).padStart(2, '0');
+    hojeLocal.setHours(0, 0, 0, 0);
     
-    const hoje = new Date(`${ano}-${mes}-${dia}T00:00:00`);
-    const dataFim = new Date(`${formatarParaBanco(outDate)}T00:00:00`);
+    const dataFim = new Date(formatarParaBanco(outDate) + 'T00:00:00');
+    dataFim.setHours(0, 0, 0, 0);
 
-    const diferencaTempo = dataFim - hoje;
-    const diferencaDias = Math.ceil(diferencaTempo / (1000 * 60 * 60 * 24));
+    const diferencaTempo = dataFim - hojeLocal;
+    const diferencaDias = Math.round(diferencaTempo / (1000 * 60 * 60 * 24));
 
-    if (diferencaDias === 0) {
-      return 'Sai hoje';
-    } else if (diferencaDias === 1) {
-      return 'Sai amanhã';
-    } else if (diferencaDias > 1) {
-      return `Sai em ${diferencaDias} dias`;
-    } else {
-      return 'Check-out encerrado';
-    }
+    if (diferencaDias === 0) return 'Sai hoje';
+    if (diferencaDias === 1) return 'Sai amanhã';
+    if (diferencaDias > 1) return `Sai em ${diferencaDias} dias`;
+    return 'Check-out encerrado';
   };
 
   const carregarReservas = async () => {
     try {
       const res = await fetch('https://organizacao-hr-stays.onrender.com/api/reservas');
+      if (!res.ok) throw new Error('Erro ao buscar dados do servidor');
+      
       const dados = await res.json();
+      
+      // Garante que o Front vai ler tanto camelCase quanto snake_case sem quebrar
       const dadosFormatados = dados.map(item => ({
-        ...item,
-        // Garante o mapeamento correto vindo do banco em snake_case para o estado do front
-        checkIn: item.check_in ? item.check_in.split('T')[0] : '',
-        checkOut: item.check_out ? item.check_out.split('T')[0] : ''
+        id: item.id,
+        hospede: item.hospede,
+        quarto: item.quarto,
+        origem: item.origem,
+        valor: item.valor,
+        checkIn: item.check_in ? item.check_in.split('T')[0] : (item.checkIn || ''),
+        checkOut: item.check_out ? item.check_out.split('T')[0] : (item.checkOut || '')
       }));
+      
       setReservas(dadosFormatados);
     } catch (err) {
       console.error('Erro ao buscar reservas do banco:', err);
@@ -80,26 +77,20 @@ export default function App() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validação local no Front-end antes de disparar a requisição
     if (!hospede || !quarto || !valor || !checkIn || !checkOut) {
-      alert('Por favor, preencha todos os campos no ecrã!');
+      alert('Por favor, preencha todos os campos!');
       return;
     }
 
-    const dataInFormatada = formatarParaBanco(checkIn);
-    const dataOutFormatada = formatarParaBanco(checkOut);
-
-    // OBJETO CORRIGIDO: Mapeado perfeitamente com a desestruturação do seu Back-end
+    // Monta o payload limpo em camelCase exato para o Back-end
     const novaReserva = { 
       hospede: String(hospede).trim(),
       quarto: String(quarto).trim(),
       origem: String(origem),
       valor: Number(valor),
-      checkIn: dataInFormatada,   // camelCase exato
-      checkOut: dataOutFormatada  // camelCase exato corrigido!
+      checkIn: checkIn,   
+      checkOut: checkOut  
     };
-
-    console.log("Enviando dados formatados para a API:", novaReserva);
 
     try {
       const respuesta = await fetch('https://organizacao-hr-stays.onrender.com/api/reservas', {
@@ -114,10 +105,9 @@ export default function App() {
         return;
       }
 
-      // Atualiza a tabela com os dados novos do banco
       await carregarReservas();
       
-      // Limpa os campos do formulário
+      // Limpa formulário
       setHospede('');
       setQuarto('');
       setValor('');
@@ -125,7 +115,6 @@ export default function App() {
       setCheckOut('');
       
       alert('Reserva salva com sucesso! 🎉');
-
     } catch (err) {
       console.error('Erro na requisição:', err);
       alert(`Falha de rede: ${err.message}`);
