@@ -46,12 +46,12 @@ app.get('/api/reservas', async (req, res) => {
   }
 });
 
-// 2. ROTA POST - Cria uma nova reserva
+// 2. ROTA POST - Cria uma nova reserva com validação de disponibilidade
 app.post('/api/reservas', async (req, res) => {
   console.log('--- Nova requisição recebida no Back-end ---');
   console.log('Dados do corpo (req.body):', req.body);
 
-  // Desestruturação exata em camelCase vinda do Front-end atualizado
+  // Desestruturação exata em camelCase vinda do Front-end
   const { hospede, quarto, origem, valor, checkIn, checkOut } = req.body;
 
   // Validação estrita dos campos obrigatórios
@@ -61,11 +61,23 @@ app.post('/api/reservas', async (req, res) => {
   }
 
   try {
-    // Query mapeando as colunas em snake_case do MySQL
-    const query = 'INSERT INTO reservas (hospede, quarto, origem, valor, check_in, check_out) VALUES (?, ?, ?, ?, ?, ?)';
+    // 🔍 VALIDAÇÃO: Verifica se o quarto já está ocupado em alguma data do período selecionado
+    const queryVerificacao = `
+      SELECT COUNT(*) AS total FROM reservas 
+      WHERE quarto = ? 
+      AND (? < check_out AND ? > check_in)
+    `;
     
-    // Passando os valores recebidos na ordem exata dos placeholders (?)
-    const [resultado] = await pool.query(query, [hospede, quarto, origem, valor, checkIn, checkOut]);
+    const [conflitos] = await pool.query(queryVerificacao, [quarto, checkIn, checkOut]);
+
+    if (conflitos[0].total > 0) {
+      console.log(`⚠️ Conflito: O quarto ${quarto} já está ocupado neste período.`);
+      return res.status(400).json({ erro: `O quarto ${quarto} já está ocupado no período selecionado.` });
+    }
+
+    // Se estiver livre, faz o INSERT mapeando as colunas em snake_case do MySQL
+    const queryInsert = 'INSERT INTO reservas (hospede, quarto, origem, valor, check_in, check_out) VALUES (?, ?, ?, ?, ?, ?)';
+    const [resultado] = await pool.query(queryInsert, [hospede, quarto, origem, valor, checkIn, checkOut]);
     
     console.log('✅ Sucesso! Reserva salva no MySQL com ID:', resultado.insertId);
 

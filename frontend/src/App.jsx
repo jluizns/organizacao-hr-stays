@@ -111,8 +111,9 @@ export default function App() {
       });
 
       if (!respuesta.ok) {
-        const textoErro = await respuesta.text();
-        alert(`Erro no Servidor (${respuesta.status}): ${textoErro}`);
+        const textoErro = await respuesta.json();
+        // Exibe o erro customizado vindo do back-end (ex: quarto ocupado)
+        alert(`Erro: ${textoErro.erro || 'Falha ao salvar reserva'}`);
         return;
       }
 
@@ -125,7 +126,7 @@ export default function App() {
       alert('Reserva salva com sucesso! 🎉');
     } catch (err) {
       console.error('Erro na requisição:', err);
-      alert(`Flha de rede: ${err.message}`);
+      alert(`Falha de rede: ${err.message}`);
     }
   };
 
@@ -134,7 +135,9 @@ export default function App() {
 
   const checkInsHoje = reservas.filter(r => r.checkIn === hojeStr);
   const checkOutsHoje = reservas.filter(r => r.checkOut === hojeStr);
-  const hospedesAtivosHoje = reservas.filter(r => hojeStr >= r.checkIn && hojeStr <= r.checkOut);
+  
+  // CORREÇÃO: Conta apenas quem está de facto no imóvel (Já entrou e NÃO faz check-out hoje)
+  const hospedesAtivosHoje = reservas.filter(r => hojeStr >= r.checkIn && hojeStr < r.checkOut);
 
   const reservasFiltradas = reservas.filter(r => {
     const dataAlvo = tipoFiltro === 'checkIn' ? r.checkIn : r.checkOut;
@@ -155,7 +158,7 @@ export default function App() {
   };
 
   // --- MATRIZ GERADORA DO CALENDÁRIO INTERATIVO ---
-  const obterDiasDoMes = () => {
+  const obtenerDiasDoMes = () => {
     const primeiroDiaDaSemana = new Date(anoAtual, mesAtual, 1).getDay();
     const totalDiasNoMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
     const matrizDias = [];
@@ -233,7 +236,7 @@ export default function App() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block mb-1 text-xs font-medium uppercase text-slate-400">Quarto</label>
-                <input type="text" value={quarto} onChange={e => setQuarto(e.target.value)} className="w-full p-3 text-sm text-white border rounded-lg bg-slate-900 border-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Ex: 102" />
+                <input type="text" value={quarto} onChange={e => setQuarto(e.target.value)} className="w-full p-3 text-sm text-white border rounded-lg bg-slate-990 border-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Ex: 102" />
               </div>
               <div>
                 <label className="block mb-1 text-xs font-medium uppercase text-slate-400">Origem</label>
@@ -290,7 +293,7 @@ export default function App() {
                 <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
               </div>
               <div className="grid grid-cols-7 gap-1">
-                {obterDiasDoMes().map((dia, index) => {
+                {obtenerDiasDoMes().map((dia, index) => {
                   if (dia === null) return <div key={`vazio-${index}`} className="h-7"></div>;
 
                   const mFmt = String(mesAtual + 1).padStart(2, '0');
@@ -434,51 +437,4 @@ export default function App() {
             <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                 <tr className="text-xs font-semibold uppercase border-b bg-slate-900/50 border-slate-700 text-slate-400">
-                  <th className="p-3 font-semibold">Hóspede</th>
-                  <th className="p-3 font-semibold">Quarto</th>
-                  <th className="p-3 font-semibold">Origem</th>
-                  <th className="p-3 font-semibold">Dias</th>
-                  <th className="p-3 font-semibold">Total</th>
-                  <th className="p-3 font-semibold text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm divide-y divide-slate-700/50">
-                {reservasFiltradas.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="py-8 text-center text-slate-500">Nenhuma reserva encontrada para os filtros selecionados.</td>
-                  </tr>
-                ) : (
-                  reservasFiltradas.map(reserva => (
-                    <tr key={reserva.id} className="transition-colors hover:bg-slate-700/30">
-                      <td className="p-3 font-medium text-slate-200">
-                        {reserva.hospede}
-                        <div className="text-[10px] text-slate-500 mt-0.5">
-                          {reserva.checkIn.split('-').reverse().join('/')} até {reserva.checkOut.split('-').reverse().join('/')}
-                        </div>
-                      </td>
-                      <td className="p-3 text-slate-300">
-                        <span className="px-2 py-1 font-mono text-xs border rounded bg-slate-900 border-slate-700">{reserva.quarto}</span>
-                      </td>
-                      <td className="p-3 text-slate-400">{reserva.origem}</td>
-                      <td className="p-3 text-slate-400">{calcularDias(reserva.checkIn, reserva.checkOut)} dias</td>
-                      <td className="p-3 font-medium text-emerald-400">R$ {Number(reserva.valor).toFixed(2)}</td>
-                      <td className="p-3 text-right">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
-                          obterStatusCheckout(reserva.checkOut) === 'Sai hoje' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 
-                          obterStatusCheckout(reserva.checkOut) === 'Sai amanhã' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 
-                          obterStatusCheckout(reserva.checkOut) === 'Check-out encerrado' ? 'bg-slate-500/20 text-slate-400 border-slate-500/30' : 
-                          'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                        }`}>{obterStatusCheckout(reserva.checkOut)}</span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-        </div>
-      </div>
-    </div>
-  );
-}
+                  <th className="p-3 font-semibold">
