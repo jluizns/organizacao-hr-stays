@@ -112,7 +112,6 @@ export default function App() {
 
       if (!respuesta.ok) {
         const textoErro = await respuesta.json();
-        // Exibe o erro customizado vindo do back-end (ex: quarto ocupado)
         alert(`Erro: ${textoErro.erro || 'Falha ao salvar reserva'}`);
         return;
       }
@@ -136,8 +135,9 @@ export default function App() {
   const checkInsHoje = reservas.filter(r => r.checkIn === hojeStr);
   const checkOutsHoje = reservas.filter(r => r.checkOut === hojeStr);
   
-  // CORREÇÃO: Conta apenas quem está de facto no imóvel (Já entrou e NÃO faz check-out hoje)
-  const hospedesAtivosHoje = reservas.filter(r => hojeStr >= r.checkIn && hojeStr < r.checkOut);
+  // 🛠️ CORREÇÃO: Filtra quem está ativo hoje e mapeia apenas os quartos ÚNICOS (removendo duplicados)
+  const reservasAtivasHoje = reservas.filter(r => hojeStr >= r.checkIn && hojeStr < r.checkOut);
+  const quartosOcupadosHoje = [...new Set(reservasAtivasHoje.map(r => String(r.quarto).trim()))];
 
   const reservasFiltradas = reservas.filter(r => {
     const dataAlvo = tipoFiltro === 'checkIn' ? r.checkIn : r.checkOut;
@@ -204,7 +204,8 @@ export default function App() {
       <div className="grid grid-cols-2 gap-3 mb-6 lg:grid-cols-4">
         <div className="p-3 border shadow-md bg-slate-800 rounded-xl border-slate-700">
           <p className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider">No Imóvel Hoje</p>
-          <p className="mt-1 text-xl font-bold text-blue-400 md:text-2xl">{hospedesAtivosHoje.length}</p>
+          {/* Mostra a contagem de quartos ocupados em relação ao limite real de 8 */}
+          <p className="mt-1 text-xl font-bold text-blue-400 md:text-2xl">{quartosOcupadosHoje.length} de 8</p>
         </div>
 
         <div className="p-3 border shadow-md bg-slate-800 rounded-xl border-slate-700">
@@ -236,7 +237,7 @@ export default function App() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block mb-1 text-xs font-medium uppercase text-slate-400">Quarto</label>
-                <input type="text" value={quarto} onChange={e => setQuarto(e.target.value)} className="w-full p-3 text-sm text-white border rounded-lg bg-slate-990 border-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Ex: 102" />
+                <input type="text" value={quarto} onChange={e => setQuarto(e.target.value)} className="w-full p-3 text-sm text-white border rounded-lg bg-slate-990 border-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Ex: 05" />
               </div>
               <div>
                 <label className="block mb-1 text-xs font-medium uppercase text-slate-400">Origem</label>
@@ -274,7 +275,7 @@ export default function App() {
         {/* Listagem de Ocupação */}
         <div className="p-4 space-y-4 border shadow-lg md:p-6 lg:col-span-2 bg-slate-800 rounded-xl border-slate-700">
           
-          {/* 🔍 COMPONENTE DE VISÃO DIÁRIA COM CALENDÁRIO NATIVO */}
+          {/* COMPONENTE DE VISÃO DIÁRIA COM CALENDÁRIO NATIVO */}
           <div className="p-3 border rounded-xl bg-slate-900/40 border-slate-700/80">
             <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-700/60">
               <div className="flex items-center gap-1.5">
@@ -361,7 +362,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* PAINEL DE FILTROS AVANÇADOS (Ajuste Mensal da Tabela) */}
+          {/* PAINEL DE FILTROS AVANÇADOS */}
           <div className="p-3 space-y-3 border rounded-xl bg-slate-900/60 border-slate-700/60">
             <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
               <span className="text-xs font-bold tracking-wide uppercase text-slate-300">Filtros de Período (Tabela e Caixa)</span>
@@ -437,4 +438,51 @@ export default function App() {
             <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                 <tr className="text-xs font-semibold uppercase border-b bg-slate-900/50 border-slate-700 text-slate-400">
-                  <th className="p-3 font-semibold">
+                  <th className="p-3 font-semibold">Hóspede</th>
+                  <th className="p-3 font-semibold">Quarto</th>
+                  <th className="p-3 font-semibold">Origem</th>
+                  <th className="p-3 font-semibold">Dias</th>
+                  <th className="p-3 font-semibold">Total</th>
+                  <th className="p-3 font-semibold text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm divide-y divide-slate-700/50">
+                {reservasFiltradas.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="py-8 text-center text-slate-500">Nenhuma reserva encontrada para os filtros selecionados.</td>
+                  </tr>
+                ) : (
+                  reservasFiltradas.map(reserva => (
+                    <tr key={reserva.id} className="transition-colors hover:bg-slate-700/30">
+                      <td className="p-3 font-medium text-slate-200">
+                        {reserva.hospede}
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          {reserva.checkIn.split('-').reverse().join('/')} até {reserva.checkOut.split('-').reverse().join('/')}
+                        </div>
+                      </td>
+                      <td className="p-3 text-slate-300">
+                        <span className="px-2 py-1 font-mono text-xs border rounded bg-slate-900 border-slate-700">{reserva.quarto}</span>
+                      </td>
+                      <td className="p-3 text-slate-400">{reserva.origem}</td>
+                      <td className="p-3 text-slate-400">{calcularDias(reserva.checkIn, reserva.checkOut)} dias</td>
+                      <td className="p-3 font-medium text-emerald-400">R$ {Number(reserva.valor).toFixed(2)}</td>
+                      <td className="p-3 text-right">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
+                          obterStatusCheckout(reserva.checkOut) === 'Sai hoje' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 
+                          obterStatusCheckout(reserva.checkOut) === 'Sai amanhã' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 
+                          obterStatusCheckout(reserva.checkOut) === 'Check-out encerrado' ? 'bg-slate-500/20 text-slate-400 border-slate-500/30' : 
+                          'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        }`}>{obterStatusCheckout(reserva.checkOut)}</span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
