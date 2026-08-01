@@ -1,5 +1,6 @@
+import './index.css'; // <--- Adicione esta linha no topo! 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-
+// Restante do seu código aqui...
 // ==========================================
 // CONFIGURAÇÕES E CONSTANTES
 // ==========================================
